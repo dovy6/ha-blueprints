@@ -225,7 +225,7 @@ blueprint:
             - high
           sort: false
           multiple: false
-  source_url: https://github.com/dovy6/ha-blueprints/blob/main/Auto%20Fan%20Speed.yaml
+  source_url: https://github.com/dovy6/ha-blueprints/blob/main/Auto_Fan_Speed.yaml
 mode: queued
 max: 10
 max_exceeded: silent
