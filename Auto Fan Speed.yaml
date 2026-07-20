@@ -1,0 +1,335 @@
+blueprint:
+  name: Daikin/Faikout Auto Fan Speed
+  description:
+    "Automatically adjusts the fan speed of a Daikin split-system AC (connected
+    via the Faikout ESP32 integration) based on how far the room's actual temperature
+    is from the AC's target/setpoint temperature. Designed to complement schedulers
+    (like Simple Scheduler) that only change the target temperature and don't control
+    fan speed.\nIncludes a temporary manual-override window: if you (or anyone in
+    the house) manually changes the fan speed via remote, app, or voice assistant,
+    this automation backs off for a configurable number of minutes before resuming
+    automatic control.\n## Setup (per room, before creating the automation) Create
+    two \"Date and/or time\" helpers (Settings > Devices & Services > Helpers > +
+    Add Helper > Date and/or time), for example:\n  - \"Living Room AC Override Until\"\n
+    \ - \"Living Room AC Last Auto Change\"\nThen create one automation instance of
+    this blueprint per room/climate entity, pointing at that room's helpers.\n"
+  domain: automation
+  input:
+    climate_entity:
+      name: AC Climate Entity
+      description: The Daikin/Faikout climate entity to control.
+      selector:
+        entity:
+          domain:
+            - climate
+          reorder: false
+          multiple: false
+    temperature_sensor:
+      name: Room Temperature Sensor (optional)
+      description:
+        "Optional external temperature sensor for this room. Leave as default
+        to use the AC's own internal temperature reading instead.
+
+        "
+      default: sensor.none
+      selector:
+        entity:
+          domain:
+            - sensor
+          reorder: false
+          multiple: false
+    override_until_helper:
+      name: "Helper: Override Until"
+      description:
+        "input_datetime helper that stores when a manual fan-speed override
+        expires. Should be a date+time helper. Create one per room.
+
+        "
+      selector:
+        entity:
+          domain:
+            - input_datetime
+          reorder: false
+          multiple: false
+    last_auto_change_helper:
+      name: "Helper: Last Automated Change"
+      description:
+        "input_datetime helper used internally to tell this automation's
+        own fan-speed changes apart from manual ones. Should be a date+time helper. Create one per room.
+
+        "
+      selector:
+        entity:
+          domain:
+            - input_datetime
+          reorder: false
+          multiple: false
+    override_minutes:
+      name: Manual Override Duration (minutes)
+      description:
+        "How long to pause automatic fan control after a manual fan-speed
+        change is detected.
+
+        "
+      default: 30
+      selector:
+        number:
+          min: 1.0
+          max: 480.0
+          unit_of_measurement: minutes
+          mode: box
+          step: 1.0
+    check_interval:
+      name: Periodic Backstop Frequency
+      description:
+        "How often to re-check fan speed even with no temperature/setpoint
+        change (safety net in case an instant trigger is missed).
+
+        "
+      default: /3
+      selector:
+        select:
+          options:
+            - label: Every 1 minute
+              value: /1
+            - label: Every 2 minutes
+              value: /2
+            - label: Every 3 minutes
+              value: /3
+            - label: Every 5 minutes
+              value: /5
+            - label: Every 10 minutes
+              value: /10
+          sort: false
+          custom_value: false
+          multiple: false
+    hysteresis:
+      name: Hysteresis Buffer (°F)
+      description:
+        "Prevents fan speed from flapping when delta sits right at a threshold.
+        Fan speed steps UP as soon as a threshold is crossed, but only steps DOWN
+        once delta clears the threshold by this amount.
+
+        "
+      default: 1.0
+      selector:
+        number:
+          min: 0.0
+          max: 5.0
+          step: 0.5
+          unit_of_measurement: °F
+          mode: box
+    threshold_low_medium:
+      name: "Threshold: Low -> Low/Medium (Δ°F)"
+      default: 1.5
+      selector:
+        number:
+          min: 0.0
+          max: 30.0
+          step: 0.5
+          mode: box
+    threshold_medium:
+      name: "Threshold: Low/Medium -> Medium (Δ°F)"
+      default: 3.5
+      selector:
+        number:
+          min: 0.0
+          max: 30.0
+          step: 0.5
+          mode: box
+    threshold_medium_high:
+      name: "Threshold: Medium -> Medium/High (Δ°F)"
+      default: 6
+      selector:
+        number:
+          min: 0.0
+          max: 30.0
+          step: 0.5
+          mode: box
+    threshold_high:
+      name: "Threshold: Medium/High -> High (Δ°F)"
+      default: 8
+      selector:
+        number:
+          min: 0.0
+          max: 30.0
+          step: 0.5
+          mode: box
+    fan_mode_low:
+      name: "Fan Mode: Low"
+      default: low
+      selector:
+        select:
+          custom_value: true
+          options:
+            - low
+            - lowMedium
+            - medium
+            - mediumHigh
+            - high
+          sort: false
+          multiple: false
+    fan_mode_low_medium:
+      name: "Fan Mode: Low/Medium"
+      default: lowMedium
+      selector:
+        select:
+          custom_value: true
+          options:
+            - low
+            - lowMedium
+            - medium
+            - mediumHigh
+            - high
+          sort: false
+          multiple: false
+    fan_mode_medium:
+      name: "Fan Mode: Medium"
+      default: medium
+      selector:
+        select:
+          custom_value: true
+          options:
+            - low
+            - lowMedium
+            - medium
+            - mediumHigh
+            - high
+          sort: false
+          multiple: false
+    fan_mode_medium_high:
+      name: "Fan Mode: Medium/High"
+      default: mediumHigh
+      selector:
+        select:
+          custom_value: true
+          options:
+            - low
+            - lowMedium
+            - medium
+            - mediumHigh
+            - high
+          sort: false
+          multiple: false
+    fan_mode_high:
+      name: "Fan Mode: High"
+      default: high
+      selector:
+        select:
+          custom_value: true
+          options:
+            - low
+            - lowMedium
+            - medium
+            - mediumHigh
+            - high
+          sort: false
+          multiple: false
+  source_url: https://pastebin.com/raw/D0df4um3
+mode: queued
+max: 10
+max_exceeded: silent
+trigger:
+  - id: temp_change
+    platform: state
+    entity_id: !input temperature_sensor
+  - id: temp_change
+    platform: state
+    entity_id: !input climate_entity
+    attribute: current_temperature
+  - id: target_change
+    platform: state
+    entity_id: !input climate_entity
+    attribute: temperature
+  - id: fan_mode_changed
+    platform: state
+    entity_id: !input climate_entity
+    attribute: fan_mode
+  - id: periodic
+    platform: time_pattern
+    minutes: !input check_interval
+action:
+  - variables:
+      climate_entity: !input climate_entity
+      temp_sensor: !input temperature_sensor
+      override_until_helper_id: !input override_until_helper
+      last_auto_change_helper_id: !input last_auto_change_helper
+      override_minutes: !input override_minutes
+      hysteresis: !input hysteresis
+      th_lm: !input threshold_low_medium
+      th_m: !input threshold_medium
+      th_mh: !input threshold_medium_high
+      th_h: !input threshold_high
+      fan_low: !input fan_mode_low
+      fan_lm: !input fan_mode_low_medium
+      fan_m: !input fan_mode_medium
+      fan_mh: !input fan_mode_medium_high
+      fan_h: !input fan_mode_high
+      current_fan_mode: "{{ state_attr(climate_entity, 'fan_mode') }}"
+      target_temp: "{{ state_attr(climate_entity, 'temperature') }}"
+      current_temp:
+        "{% if temp_sensor not in ['', 'sensor.none', none]\n      and states(temp_sensor)
+        not in ['unknown', 'unavailable'] %}\n  {{ states(temp_sensor) }}\n{% else %}\n
+        \ {{ state_attr(climate_entity, 'current_temperature') }}\n{% endif %}\n"
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: fan_mode_changed
+        sequence:
+          - if:
+              - condition: template
+                value_template:
+                  "{{ (as_timestamp(now()) - as_timestamp(states(last_auto_change_helper_id),
+                  0)) > 8 }}
+
+                  "
+            then:
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: !input override_until_helper
+                data:
+                  datetime: "{{ (now() + timedelta(minutes=override_minutes | int)) }}"
+    default:
+      - condition: template
+        value_template: "{{ states(climate_entity) == 'cool' }}"
+      - condition: template
+        value_template:
+          "{{ target_temp not in [none, 'unknown', 'unavailable']\n   and
+          current_temp not in [none, 'unknown', 'unavailable'] }}\n"
+      - condition: template
+        value_template:
+          "{{ states(override_until_helper_id) in ['unknown','unavailable',none]
+          or as_timestamp(now()) > as_timestamp(states(override_until_helper_id), 0) }}
+
+          "
+      - variables:
+          delta: "{{ current_temp | float - target_temp | float }}"
+          desired_fan_mode:
+            "{% set cm = current_fan_mode %} {% if cm == fan_low %}\n
+            \ {% if delta >= th_lm %}{% set result = fan_lm %}{% else %}{% set result
+            = fan_low %}{% endif %}\n{% elif cm == fan_lm %}\n  {% if delta >= th_m %}{%
+            set result = fan_m %}\n  {% elif delta < (th_lm - hysteresis) %}{% set result
+            = fan_low %}\n  {% else %}{% set result = fan_lm %}{% endif %}\n{% elif cm
+            == fan_m %}\n  {% if delta >= th_mh %}{% set result = fan_mh %}\n  {% elif
+            delta < (th_m - hysteresis) %}{% set result = fan_lm %}\n  {% else %}{% set
+            result = fan_m %}{% endif %}\n{% elif cm == fan_mh %}\n  {% if delta >= th_h
+            %}{% set result = fan_h %}\n  {% elif delta < (th_mh - hysteresis) %}{% set
+            result = fan_m %}\n  {% else %}{% set result = fan_mh %}{% endif %}\n{% elif
+            cm == fan_h %}\n  {% if delta < (th_h - hysteresis) %}{% set result = fan_mh
+            %}\n  {% else %}{% set result = fan_h %}{% endif %}\n{% else %}\n  {% if delta
+            >= th_h %}{% set result = fan_h %}\n  {% elif delta >= th_mh %}{% set result
+            = fan_mh %}\n  {% elif delta >= th_m %}{% set result = fan_m %}\n  {% elif
+            delta >= th_lm %}{% set result = fan_lm %}\n  {% else %}{% set result = fan_low
+            %}{% endif %}\n{% endif %} {{ result }}\n"
+      - condition: template
+        value_template: "{{ (desired_fan_mode | trim) != current_fan_mode }}"
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: !input last_auto_change_helper
+        data:
+          datetime: "{{ now() }}"
+      - service: climate.set_fan_mode
+        target:
+          entity_id: !input climate_entity
+        data:
+          fan_mode: "{{ desired_fan_mode | trim }}"
