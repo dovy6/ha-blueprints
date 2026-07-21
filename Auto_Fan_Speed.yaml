@@ -278,11 +278,12 @@ action:
         sequence:
           - if:
               - condition: template
-                value_template:
-                  "{{ (as_timestamp(now()) - as_timestamp(states(last_auto_change_helper_id),
-                  0)) > 8 }}
-
-                  "
+                value_template: >
+                  {{ (as_timestamp(now()) - as_timestamp(states(last_auto_change_helper_id), 0)) > 8 }}
+              - condition: template
+                value_template: >
+                  {{ trigger.from_state is not none
+                     and trigger.from_state.state not in ['off', 'unknown', 'unavailable'] }}
             then:
               - service: input_datetime.set_datetime
                 target:
