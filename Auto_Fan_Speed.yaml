@@ -268,8 +268,7 @@ action:
       current_fan_mode: "{{ state_attr(climate_entity, 'fan_mode') }}"
       target_temp: "{{ state_attr(climate_entity, 'temperature') }}"
       current_temp:
-        "{% if temp_sensor not in ['', 'sensor.none', none]\n      and states(temp_sensor)
-        not in ['unknown', 'unavailable'] %}\n  {{ states(temp_sensor) }}\n{% else %}\n
+        "{% if has_value(temp_sensor) %}\n  {{ states(temp_sensor) }}\n{% else %}\n
         \ {{ state_attr(climate_entity, 'current_temperature') }}\n{% endif %}\n"
   - choose:
       - conditions:
